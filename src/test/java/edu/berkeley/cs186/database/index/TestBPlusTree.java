@@ -233,6 +233,7 @@ public class TestBPlusTree {
         l = String.format("(%s 3 %s)", ll, lr);
         m = String.format("(%s 6 %s)", ml, mr);
         r = String.format("(%s 8 %s)", rl, rr);
+        tree.toDotPDFFile("tree.pdf");
         assertEquals(String.format("(%s 4 %s 7 %s)", l, m, r), tree.toSexp());
 
         //            (4 7)

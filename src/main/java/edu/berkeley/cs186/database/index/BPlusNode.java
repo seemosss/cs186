@@ -271,4 +271,13 @@ abstract class BPlusNode {
             p.unpin();
         }
     }
+
+    public static DataBox getLeastChildKey(BPlusTreeMetadata metadata, BufferManager bufferManager,
+                                           LockContext treeContext, long ChildPageNum) {
+        BPlusNode newChild = BPlusNode.fromBytes(metadata, bufferManager, treeContext, ChildPageNum);
+        DataBox leastKey = null;
+        if (newChild instanceof LeafNode) leastKey = ((LeafNode) newChild).getKeys().get(0);
+        else leastKey = ((InnerNode)newChild).getKeys().get(0);
+        return leastKey;
+    }
 }
