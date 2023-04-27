@@ -3,12 +3,16 @@ package edu.berkeley.cs186.database.query;
 import edu.berkeley.cs186.database.TransactionContext;
 import edu.berkeley.cs186.database.common.Pair;
 import edu.berkeley.cs186.database.common.iterator.BacktrackingIterator;
+import edu.berkeley.cs186.database.databox.DataBox;
 import edu.berkeley.cs186.database.query.disk.Run;
+import edu.berkeley.cs186.database.table.PageDirectory;
 import edu.berkeley.cs186.database.table.Record;
 import edu.berkeley.cs186.database.table.Schema;
+import edu.berkeley.cs186.database.table.Table;
 import edu.berkeley.cs186.database.table.stats.TableStats;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 public class SortOperator extends QueryOperator {
     protected Comparator<Record> comparator;
@@ -87,7 +91,15 @@ public class SortOperator extends QueryOperator {
      */
     public Run sortRun(Iterator<Record> records) {
         // TODO(proj3_part1): implement
-        return null;
+        Run run = makeRun();
+        List<Record> recordList = new ArrayList<>();
+        while(records.hasNext()) {
+            Record record = records.next();
+            recordList.add(record);
+        }
+        Collections.sort(recordList, new RecordComparator());
+        run.addAll(recordList);
+        return run;
     }
 
     /**
@@ -108,7 +120,26 @@ public class SortOperator extends QueryOperator {
     public Run mergeSortedRuns(List<Run> runs) {
         assert (runs.size() <= this.numBuffers - 1);
         // TODO(proj3_part1): implement
-        return null;
+        PriorityQueue<Pair<Record, Integer>> priorityQueue = new PriorityQueue<>(new RecordPairComparator());
+        List<Iterator<Record>> iterators = new ArrayList<>();
+        for (int i = 0; i < runs.size(); i++) {
+            Iterator<Record> iterator = runs.get(i).iterator();
+            iterators.add(iterator);
+            if (iterator.hasNext()) {
+                priorityQueue.add(new Pair<>(iterator.next(), i));
+            }
+        }
+        Run run = makeRun();
+        while (!priorityQueue.isEmpty()) {
+            Pair<Record, Integer> pair = priorityQueue.poll();
+            run.add(pair.getFirst());
+            int i = pair.getSecond();
+            Iterator<Record> iterator = iterators.get(i);
+            if (iterator.hasNext()) {
+                priorityQueue.add(new Pair<>(iterator.next(), i));
+            }
+        }
+        return run;
     }
 
     /**
@@ -133,7 +164,18 @@ public class SortOperator extends QueryOperator {
      */
     public List<Run> mergePass(List<Run> runs) {
         // TODO(proj3_part1): implement
-        return Collections.emptyList();
+        int i = 0;
+        List<Run> mergeResult = new ArrayList<>();
+        while (i < runs.size()) {
+            List<Run> mergeList = new ArrayList<>();
+            int j = i;
+            for (; j < runs.size() && j < i + this.numBuffers - 1; j++) {
+                mergeList.add(runs.get(j));
+            }
+            mergeResult.add(mergeSortedRuns(mergeList));
+            i = j;
+        }
+        return mergeResult;
     }
 
     /**
@@ -149,7 +191,20 @@ public class SortOperator extends QueryOperator {
         Iterator<Record> sourceIterator = getSource().iterator();
 
         // TODO(proj3_part1): implement
-        return makeRun(); // TODO(proj3_part1): replace this!
+        List<Run> runs = new ArrayList<>();
+        List<Iterator<Record>> iterators = new ArrayList<>();
+        while (sourceIterator.hasNext()) {
+            BacktrackingIterator<Record> blockIterator = getBlockIterator(sourceIterator, getSource().getSchema(), numBuffers);
+            iterators.add(blockIterator);
+        }
+        for (Iterator<Record> iterator : iterators) {
+            Run run = sortRun(iterator);
+            runs.add(run);
+        }
+        while (runs.size() > 1) {
+            runs = mergePass(runs);
+        }
+        return runs.get(0);
     }
 
     /**
