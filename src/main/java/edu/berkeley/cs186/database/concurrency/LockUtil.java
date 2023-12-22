@@ -2,6 +2,8 @@ package edu.berkeley.cs186.database.concurrency;
 
 import edu.berkeley.cs186.database.TransactionContext;
 
+import static edu.berkeley.cs186.database.concurrency.LockType.IX;
+
 /**
  * LockUtil is a declarative layer which simplifies multigranularity lock
  * acquisition for the user (you, in the last task of Part 2). Generally
@@ -42,8 +44,43 @@ public class LockUtil {
         LockType explicitLockType = lockContext.getExplicitLockType(transaction);
 
         // TODO(proj4_part2): implement
-        return;
+        if (LockType.substitutable(effectiveLockType, requestType)) {
+//            lockContext.release(transaction);
+//            lockContext.acquire(transaction, requestType);
+            return;
+        }
+        if (requestType == LockType.NL) return;
+        if (requestType == LockType.S) {
+            if (explicitLockType == LockType.IS) lockContext.promote(transaction, LockType.S);
+            if (explicitLockType == LockType.IX) lockContext.promote(transaction, LockType.SIX);
+            if (explicitLockType == LockType.NL){
+                grantAncestorLock(transaction, parentContext, LockType.IS);
+                lockContext.acquire(transaction, requestType);
+            }
+        }
+        if(requestType == LockType.X) {
+            if (explicitLockType == LockType.IS || explicitLockType == LockType.S || explicitLockType == LockType.SIX) {
+                grantAncestorLock(transaction, parentContext, LockType.IX);
+                lockContext.promote(transaction, requestType);
+            }
+            if (explicitLockType == LockType.IX) lockContext.promote(transaction, LockType.X);
+            if (explicitLockType == LockType.NL) {
+                grantAncestorLock(transaction, parentContext, LockType.IX);
+                lockContext.acquire(transaction, requestType);
+            }
+        }
     }
 
     // TODO(proj4_part2) add any helper methods you want
+    public static void grantAncestorLock(TransactionContext transactionContext, LockContext lockContext, LockType lockType) {
+        if (transactionContext == null) return;
+        LockType thisType = lockContext.getExplicitLockType(transactionContext);
+        if (thisType == lockType) return;
+        if (thisType == LockType.IX) return;
+        if (lockContext.parentContext() != null) {
+            grantAncestorLock(transactionContext, lockContext.parentContext(), lockType);
+        }
+        if (thisType == LockType.NL) lockContext.acquire(transactionContext, lockType);
+        if (thisType == LockType.IS) lockContext.promote(transactionContext, lockType);
+    }
 }

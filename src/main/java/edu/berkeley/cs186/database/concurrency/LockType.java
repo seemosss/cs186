@@ -21,9 +21,16 @@ public enum LockType {
         if (a == null || b == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
-
-        return false;
+        // DONE(proj4_part1): implement
+        switch (a) {
+            case NL: return true;
+            case IS: return b != X;
+            case IX: return b != X && b != SIX && b != S;
+            case S: return b != X && b != SIX && b != IX;
+            case SIX: return b == IS || b == NL;
+            case X: return b == NL;
+            default: throw new UnsupportedOperationException("bad lock type");
+        }
     }
 
     /**
@@ -53,8 +60,12 @@ public enum LockType {
         if (parentLockType == null || childLockType == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
-
+        // DONE(proj4_part1): implement
+        if (childLockType == NL) return true;
+        if (childLockType == S || childLockType == IS)
+            return parentLockType == S || parentLockType == IS || parentLockType == IX || parentLockType == SIX;
+        if (childLockType == X || childLockType == IX || childLockType == SIX)
+            return parentLockType == IX || parentLockType == SIX;
         return false;
     }
 
@@ -68,9 +79,19 @@ public enum LockType {
         if (required == null || substitute == null) {
             throw new NullPointerException("null lock type");
         }
-        // TODO(proj4_part1): implement
-
-        return false;
+        // DONE(proj4_part1): implement
+        if (substitute == required)
+            return true;
+        switch (required) {
+            case NL: return true;
+            case IS: return substitute != NL;
+            case IX:
+            case S:
+            case SIX:
+                return substitute == X || substitute == SIX;
+            case X: return false;
+            default: throw new UnsupportedOperationException("bad lock type");
+        }
     }
 
     /**
