@@ -44,36 +44,38 @@ public class LockUtil {
         LockType explicitLockType = lockContext.getExplicitLockType(transaction);
 
         // TODO(proj4_part2): implement
+        // case 1
         if (LockType.substitutable(effectiveLockType, requestType)) {
 //            lockContext.release(transaction);
 //            lockContext.acquire(transaction, requestType);
             return;
         }
-        if (requestType == LockType.NL) return;
+
+        //case 2
+        if (requestType == LockType.S && explicitLockType == LockType.IX) {
+            lockContext.promote(transaction, LockType.SIX);
+            return;
+        }
+
+        //case 3
+        if (explicitLockType.isIntent()) {
+            lockContext.escalate(transaction);
+            explicitLockType = lockContext.getExplicitLockType(transaction);
+            if (explicitLockType == requestType || explicitLockType == LockType.X) return;
+        }
+
         if (requestType == LockType.S) {
-            if (explicitLockType == LockType.IS) lockContext.promote(transaction, LockType.S);
-            if (explicitLockType == LockType.IX) lockContext.promote(transaction, LockType.SIX);
-            if (explicitLockType == LockType.NL){
-                grantAncestorLock(transaction, parentContext, LockType.IS);
-                lockContext.acquire(transaction, requestType);
-            }
+            grantAncestorLock(transaction, parentContext, LockType.IS);
+        } else {
+            grantAncestorLock(transaction, parentContext, LockType.IX);
         }
-        if(requestType == LockType.X) {
-            if (explicitLockType == LockType.IS || explicitLockType == LockType.S || explicitLockType == LockType.SIX) {
-                grantAncestorLock(transaction, parentContext, LockType.IX);
-                lockContext.promote(transaction, requestType);
-            }
-            if (explicitLockType == LockType.IX) lockContext.promote(transaction, LockType.X);
-            if (explicitLockType == LockType.NL) {
-                grantAncestorLock(transaction, parentContext, LockType.IX);
-                lockContext.acquire(transaction, requestType);
-            }
-        }
+        if (explicitLockType == LockType.NL) lockContext.acquire(transaction, requestType);
+        else lockContext.promote(transaction, requestType);
     }
 
     // TODO(proj4_part2) add any helper methods you want
     public static void grantAncestorLock(TransactionContext transactionContext, LockContext lockContext, LockType lockType) {
-        if (transactionContext == null) return;
+        if (transactionContext == null || lockContext == null) return;
         LockType thisType = lockContext.getExplicitLockType(transactionContext);
         if (thisType == lockType) return;
         if (thisType == LockType.IX) return;

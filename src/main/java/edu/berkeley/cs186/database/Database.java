@@ -931,10 +931,12 @@ public class Database implements AutoCloseable {
         public void close() {
             try {
                 // TODO(proj4_part2)
-                LockContext dbContext = lockManager.databaseContext();
-                dbContext.releaseChild(this);
-                if (dbContext.getExplicitLockType(this) != LockType.NL)
-                    dbContext.release(this);
+                TransactionContext transaction = TransactionContext.getTransaction();
+                List<Lock> locks = lockManager.getLocks(transaction);
+                for (int i = locks.size() - 1; i >= 0; i--) {
+                    ResourceName name = locks.get(i).name;
+                    LockContext.fromResourceName(lockManager, name).release(transaction);
+                }
 
             } catch (Exception e) {
                 // There's a chance an error message from your release phase
